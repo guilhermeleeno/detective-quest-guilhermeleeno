@@ -9,151 +9,174 @@
 #include <stdlib.h>
 #include <string.h>
 
-// struct da pista
-struct Pista {
+#define TAM 10   // Tamanho da tabela hash
+
+// struct pistas
+struct PistaNodo {
     char texto[100];
-    struct Pista *esq;
-    struct Pista *dir;
+    struct PistaNodo *prox;
 };
 
-// criar uma pista
-struct Pista* novaPista(char texto[]) {
-    struct Pista *p = (struct Pista*)malloc(sizeof(struct Pista));
-    strcpy(p->texto, texto);
-    p->esq = NULL;
-    p->dir = NULL;
-    return p;
-}
 
-// insere bts ordem alfabética
-struct Pista* inserirPista(struct Pista *raiz, char texto[]) {
-    if (raiz == NULL) {
-        return novaPista(texto);
-    }
+// Estrutura do suspeito (cada posição da hash)
 
-    if (strcmp(texto, raiz->texto) < 0) {
-        raiz->esq = inserirPista(raiz->esq, texto);
-    } else {
-        raiz->dir = inserirPista(raiz->dir, texto);
-    }
-
-    return raiz;
-}
-
-// exibe as pistas em ordem alfabética
-
-void listarPistas(struct Pista *raiz) {
-    if (raiz == NULL) return;
-
-    listarPistas(raiz->esq);
-    printf(" - %s\n", raiz->texto);
-    listarPistas(raiz->dir);
-}
-
-// esquema de exploração com as pistas
-struct Sala {
+struct Suspeito {
     char nome[50];
-    struct Sala *esq;
-    struct Sala *dir;
-    char pistaSala[100];  // pista associada à sala
+    int contador;                // quantas pistas associadas
+    struct PistaNodo *pistas;    // lista encadeada de pistas
+    struct Suspeito *prox;       // colisões (encadeamento externo)
 };
 
-struct Sala* criarSala(char nome[], char pista[]) {
-    struct Sala *s = (struct Sala*)malloc(sizeof(struct Sala));
+// Tabela hash
+struct Suspeito* tabela[TAM];
+
+
+// Função hash simples (soma ASCII do nome mod TAM)
+
+int hash(char nome[]) {
+    int soma = 0;
+    for (int i = 0; nome[i] != '\0'; i++) {
+        soma += nome[i];
+    }
+    return soma % TAM;
+}
+
+
+// Inicializa hash com NULLs
+
+void inicializarHash() {
+    for (int i = 0; i < TAM; i++) {
+        tabela[i] = NULL;
+    }
+}
+
+// Cria estrutura de suspeito
+
+struct Suspeito* criarSuspeito(char nome[]) {
+    struct Suspeito *s = (struct Suspeito*)malloc(sizeof(struct Suspeito));
     strcpy(s->nome, nome);
-    strcpy(s->pistaSala, pista);
-    s->esq = NULL;
-    s->dir = NULL;
+    s->contador = 0;
+    s->pistas = NULL;
+    s->prox = NULL;
     return s;
 }
 
-// adiciona pista ao entrar na sala
-void explorar(struct Sala *atual, struct Pista **arvorePistas) {
-    char opcao;
 
-    while (1) {
-        printf("\n📍 Você está na sala: %s\n", atual->nome);
+// Busca suspeito na tabela hash (com colisões)
 
-        // Se a sala tiver pista, adiciona
-        if (strlen(atual->pistaSala) > 0) {
-            printf("🔎 Você encontrou uma pista: %s\n", atual->pistaSala);
-            *arvorePistas = inserirPista(*arvorePistas, atual->pistaSala);
+struct Suspeito* buscarSuspeito(char nome[]) {
+    int idx = hash(nome);
+    struct Suspeito *atual = tabela[idx];
+
+    while (atual != NULL) {
+        if (strcmp(atual->nome, nome) == 0) {
+            return atual;
         }
+        atual = atual->prox;
+    }
 
-        printf("\nMover:\n");
-        printf("  (e) Ir para esquerda\n");
-        printf("  (d) Ir para direita\n");
-        printf("  (p) Revisar pistas coletadas\n");
-        printf("  (s) Sair\n");
-        printf("Escolha: ");
-        scanf(" %c", &opcao);
+    return NULL; // não encontrado
+}
 
-        if (opcao == 's') {
-            printf("\nSaindo da mansão...\n");
-            return;
-        }
+// Insere pista dentro da lista deste suspeito
 
-        if (opcao == 'p') {
-            printf("\n📚 Pistas coletadas:\n");
-            if (*arvorePistas == NULL) {
-                printf("Nenhuma pista ainda!\n");
-            } else {
-                listarPistas(*arvorePistas);
+void adicionarPistaAoSuspeito(struct Suspeito *suspeito, char texto[]) {
+    struct PistaNodo *novo = (struct PistaNodo*)malloc(sizeof(struct PistaNodo));
+    strcpy(novo->texto, texto);
+    novo->prox = suspeito->pistas;
+    suspeito->pistas = novo;
+
+    suspeito->contador++; // incrementa quantidade
+}
+
+// Insere relação (suspeito + pista)
+
+void inserirHash(char nomeSuspeito[], char pista[]) {
+    int idx = hash(nomeSuspeito);
+
+    // Procura se já existe
+    struct Suspeito *s = buscarSuspeito(nomeSuspeito);
+
+    // Não existe → criar
+    if (s == NULL) {
+        s = criarSuspeito(nomeSuspeito);
+        s->prox = tabela[idx];     // encadeamento em caso de colisão
+        tabela[idx] = s;
+    }
+
+    // Adiciona pista ao suspeito
+    adicionarPistaAoSuspeito(s, pista);
+}
+
+
+// Exibe todos os suspeitos e suas pistas
+
+void listarAssociacoes() {
+    printf("\n===== SUSPEITOS E SUAS PISTAS =====\n");
+
+    for (int i = 0; i < TAM; i++) {
+        struct Suspeito *s = tabela[i];
+
+        while (s != NULL) {
+            printf("\nSuspeito: %s\n", s->nome);
+            printf("Citações: %d\n", s->contador);
+            printf("Pistas:\n");
+
+            struct PistaNodo *p = s->pistas;
+            while (p != NULL) {
+                printf(" - %s\n", p->texto);
+                p = p->prox;
             }
-            continue;
-        }
 
-        if (opcao == 'e') {
-            if (atual->esq != NULL) {
-                atual = atual->esq;
-            } else {
-                printf("Não existe sala à esquerda!\n");
-            }
-        }
-        else if (opcao == 'd') {
-            if (atual->dir != NULL) {
-                atual = atual->dir;
-            } else {
-                printf("Não existe sala à direita!\n");
-            }
-        }
-        else {
-            printf("Opção inválida!\n");
+            s = s->prox; // prossiga na lista de colisão
         }
     }
 }
 
-// começa o main
+// Determina o suspeito mais provável
+
+void suspeitoMaisProvavel() {
+    struct Suspeito *mais = NULL;
+
+    for (int i = 0; i < TAM; i++) {
+        struct Suspeito *s = tabela[i];
+
+        while (s != NULL) {
+            if (mais == NULL || s->contador > mais->contador) {
+                mais = s;
+            }
+            s = s->prox;
+        }
+    }
+
+    printf("\n===== SUSPEITO MAIS PROVÁVEL =====\n");
+
+    if (mais == NULL) {
+        printf("Nenhum suspeito registrado.\n");
+        return;
+    }
+
+    printf("Suspeito: %s\n", mais->nome);
+    printf("Citações: %d\n", mais->contador);
+}
+
+
+// MAIN (exemplo de uso)
+
 int main() {
-    struct Pista *arvorePistas = NULL;
 
-    // Criando salas com possíveis pistas
-    struct Sala *hall       = criarSala("Hall de Entrada", "");
-    struct Sala *biblioteca = criarSala("Biblioteca", "Página rasgada de um diário");
-    struct Sala *cozinha    = criarSala("Cozinha", "");
-    struct Sala *sotao      = criarSala("Sótão", "Chave enferrujada");
-    struct Sala *porao      = criarSala("Porão", "Pegadas de barro");
-    struct Sala *jantar     = criarSala("Sala de Jantar", "Copo quebrado com cheiro estranho");
+    inicializarHash();
 
-    //visual da arvore
-    /*
-            Hall
-           /    \
-    Biblioteca   Cozinha
-      /    \        \
-   Sótão  Porão   Sala Jantar
-    */
+    // Exemplos de pistas coletadas
+    inserirHash("Sr. Corvino", "Pegadas de barro");
+    inserirHash("Dona Mirela", "Copo quebrado");
+    inserirHash("Sr. Corvino", "Chave enferrujada");
+    inserirHash("Dona Mirela", "Página rasgada");
+    inserirHash("Sombra Alta", "Som metálico no porão");
+    inserirHash("Sr. Corvino", "Diário rasgado");
 
-    hall->esq = biblioteca;
-    hall->dir = cozinha;
-
-    biblioteca->esq = sotao;
-    biblioteca->dir = porao;
-
-    cozinha->dir = jantar;
-
-    // Inicia exploração
-    explorar(hall, &arvorePistas);
+    listarAssociacoes();
+    suspeitoMaisProvavel();
 
     return 0;
 }
