@@ -1,48 +1,106 @@
-//detective quest novato
+//detective quest aventureiro
 
 //obs. eu não tenho mais acesso ao conteudo do curso, estou fazendo com base nas informações que tem nesse arquivo...
-//Application error: a client-side exception has occurred (see the browser console for more information).
 
+//bloqueram tudo, até o app não entra mais
+//Application error: a client-side exception has occurred (see the browser console for more information).
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+// struct da pista
+struct Pista {
+    char texto[100];
+    struct Pista *esq;
+    struct Pista *dir;
+};
 
-// Struct da sala
+// criar uma pista
+struct Pista* novaPista(char texto[]) {
+    struct Pista *p = (struct Pista*)malloc(sizeof(struct Pista));
+    strcpy(p->texto, texto);
+    p->esq = NULL;
+    p->dir = NULL;
+    return p;
+}
+
+// insere bts ordem alfabética
+struct Pista* inserirPista(struct Pista *raiz, char texto[]) {
+    if (raiz == NULL) {
+        return novaPista(texto);
+    }
+
+    if (strcmp(texto, raiz->texto) < 0) {
+        raiz->esq = inserirPista(raiz->esq, texto);
+    } else {
+        raiz->dir = inserirPista(raiz->dir, texto);
+    }
+
+    return raiz;
+}
+
+// exibe as pistas em ordem alfabética
+
+void listarPistas(struct Pista *raiz) {
+    if (raiz == NULL) return;
+
+    listarPistas(raiz->esq);
+    printf(" - %s\n", raiz->texto);
+    listarPistas(raiz->dir);
+}
+
+// esquema de exploração com as pistas
 struct Sala {
     char nome[50];
     struct Sala *esq;
     struct Sala *dir;
+    char pistaSala[100];  // pista associada à sala
 };
 
-// Criando a Sala
-struct Sala* criarSala(char nome[]) {
-    struct Sala *nova = (struct Sala*)malloc(sizeof(struct Sala));
-    strcpy(nova->nome, nome);
-    nova->esq = NULL;
-    nova->dir = NULL;
-    return nova;
+struct Sala* criarSala(char nome[], char pista[]) {
+    struct Sala *s = (struct Sala*)malloc(sizeof(struct Sala));
+    strcpy(s->nome, nome);
+    strcpy(s->pistaSala, pista);
+    s->esq = NULL;
+    s->dir = NULL;
+    return s;
 }
 
-//Explorando
-void explorar(struct Sala *atual) {
-    if (atual == NULL) return;
-
+// adiciona pista ao entrar na sala
+void explorar(struct Sala *atual, struct Pista **arvorePistas) {
     char opcao;
 
     while (1) {
         printf("\n📍 Você está na sala: %s\n", atual->nome);
-        printf("Mover:\n");
-        printf("  (e) Ir para sala à esquerda\n");
-        printf("  (d) Ir para sala à direita\n");
-        printf("  (s) Sair da mansão\n");
+
+        // Se a sala tiver pista, adiciona
+        if (strlen(atual->pistaSala) > 0) {
+            printf("🔎 Você encontrou uma pista: %s\n", atual->pistaSala);
+            *arvorePistas = inserirPista(*arvorePistas, atual->pistaSala);
+        }
+
+        printf("\nMover:\n");
+        printf("  (e) Ir para esquerda\n");
+        printf("  (d) Ir para direita\n");
+        printf("  (p) Revisar pistas coletadas\n");
+        printf("  (s) Sair\n");
         printf("Escolha: ");
         scanf(" %c", &opcao);
 
         if (opcao == 's') {
-            printf("\nVocê decidiu sair da mansão...\n");
+            printf("\nSaindo da mansão...\n");
             return;
+        }
+
+        if (opcao == 'p') {
+            printf("\n📚 Pistas coletadas:\n");
+            if (*arvorePistas == NULL) {
+                printf("Nenhuma pista ainda!\n");
+            } else {
+                listarPistas(*arvorePistas);
+            }
+            continue;
         }
 
         if (opcao == 'e') {
@@ -51,36 +109,39 @@ void explorar(struct Sala *atual) {
             } else {
                 printf("Não existe sala à esquerda!\n");
             }
-        } else if (opcao == 'd') {
+        }
+        else if (opcao == 'd') {
             if (atual->dir != NULL) {
                 atual = atual->dir;
             } else {
                 printf("Não existe sala à direita!\n");
             }
-        } else {
+        }
+        else {
             printf("Opção inválida!\n");
         }
     }
 }
 
-//Aplicando no main
+// começa o main
 int main() {
+    struct Pista *arvorePistas = NULL;
 
-//Criando as salas fixas (árvore pronta)
-    struct Sala *hall        = criarSala("Hall de Entrada");
-    struct Sala *biblioteca  = criarSala("Biblioteca");
-    struct Sala *cozinha     = criarSala("Cozinha");
-    struct Sala *salaJantar  = criarSala("Sala de Jantar");
-    struct Sala *sotao       = criarSala("Sótão");
-    struct Sala *porao       = criarSala("Porão");
+    // Criando salas com possíveis pistas
+    struct Sala *hall       = criarSala("Hall de Entrada", "");
+    struct Sala *biblioteca = criarSala("Biblioteca", "Página rasgada de um diário");
+    struct Sala *cozinha    = criarSala("Cozinha", "");
+    struct Sala *sotao      = criarSala("Sótão", "Chave enferrujada");
+    struct Sala *porao      = criarSala("Porão", "Pegadas de barro");
+    struct Sala *jantar     = criarSala("Sala de Jantar", "Copo quebrado com cheiro estranho");
 
-    //desenho de como ficou a estutura da arvore
+    //visual da arvore
     /*
             Hall
            /    \
-     Biblioteca  Cozinha
-        /  \      /   \
-   Sótão  Porão  Sala Jantar  (NULL)
+    Biblioteca   Cozinha
+      /    \        \
+   Sótão  Porão   Sala Jantar
     */
 
     hall->esq = biblioteca;
@@ -89,10 +150,10 @@ int main() {
     biblioteca->esq = sotao;
     biblioteca->dir = porao;
 
-    cozinha->esq = salaJantar;
+    cozinha->dir = jantar;
 
-    // Começa a exploração
-    explorar(hall);
+    // Inicia exploração
+    explorar(hall, &arvorePistas);
 
     return 0;
 }
